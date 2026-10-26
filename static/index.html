@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Management System</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f3f4f6; --surface: #ffffff; --text: #1f2937; --border: #e5e7eb; --danger: #ef4444; --warning: #f59e0b; --success: #10b981; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+        
+        #login-screen { display: flex; height: 100vh; align-items: center; justify-content: center; }
+        .login-box { background: var(--surface); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 100%; max-width: 400px; }
+        .login-box h2 { margin-bottom: 1.5rem; text-align: center; }
+        
+        input, select { width: 100%; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 4px; }
+        button { width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #1d4ed8; }
+        
+        #dashboard { display: none; height: 100vh; }
+        .sidebar { width: 250px; background: #111827; color: white; padding: 1rem; display: flex; flex-direction: column; }
+        .sidebar h2 { font-size: 1.25rem; margin-bottom: 2rem; text-align: center; }
+        .nav-item { padding: 0.75rem; cursor: pointer; border-radius: 4px; margin-bottom: 0.5rem; transition: 0.2s; }
+        .nav-item:hover, .nav-item.active { background: #374151; }
+        
+        .main-content { flex: 1; padding: 2rem; overflow-y: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .card { background: var(--surface); border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgb(0 0 0 / 0.1); margin-bottom: 2rem; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f9fafb; font-weight: 600; }
+        
+        .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+        .form-row input, .form-row select { margin-bottom: 0; width: auto; flex: 1; min-width: 120px; }
+        .form-row button { width: auto; padding: 0.75rem 1.5rem; }
+        
+        .btn-sm { padding: 0.4rem 0.8rem; width: auto; font-size: 0.875rem; }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-warning { background: var(--warning); color: white; margin-right: 0.5rem; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #047857; }
+        .btn-secondary { background: #4b5563; color: white; margin-right: 0.5rem; }
+        .btn-secondary:hover { background: #374151; }
+        
+        .hidden { display: none !important; }
+        
+        .stat-box { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .stat { background: #e0e7ff; padding: 1rem; border-radius: 8px; flex: 1; text-align: center; }
+        .stat h4 { font-size: 2rem; color: var(--primary); }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 2rem; border-radius: 8px; width: 100%; max-width: 400px; }
+        
+        a.forgot-link { display: block; text-align: center; margin-top: 1rem; color: var(--primary); text-decoration: none; font-size: 0.875rem; cursor: pointer; }
+        a.forgot-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <h2>School Login</h2>
+            <div id="login-error" style="color: red; margin-bottom: 1rem; display: none;"></div>
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="login()">Sign In</button>
+            <a class="forgot-link" onclick="showForgotModal()">Forgot Password?</a>
+        </div>
+    </div>
+
+    <!-- FORGOT PASSWORD MODAL -->
+    <div id="forgot-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 1rem;">Reset Password</h3>
+            <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">Enter your email and a new password.</p>
+            <div id="reset-error" style="color: red; margin-bottom: 1rem; display: none; font-size: 0.875rem;"></div>
+            <input type="email" id="reset-email" placeholder="Email">
+            <input type="password" id="reset-pass" placeholder="New Password (min 8 chars)">
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button class="btn-success" onclick="resetPassword()">Reset Password</button>
+                <button style="background: #6b7280;" onclick="closeForgotModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard">
+        <div class="sidebar">
+            <h2>SMS Dashboard</h2>
+            
+            <div id="menu-admin" class="hidden">
+                <div class="nav-item active" onclick="switchTab('admin-students', this)">Manage Students</div>
+                <div class="nav-item" onclick="switchTab('admin-teachers', this)">Manage Teachers</div>
+                <div class="nav-item" onclick="switchTab('admin-enrollments', this)">Enrollments</div>
+                <div class="nav-item" onclick="switchTab('admin-assignments', this)">Assignments</div>
+                <div class="nav-item" onclick="switchTab('admin-assessments', this)">Assessments</div>
+            </div>
+
+            <div id="menu-teacher" class="hidden">
+                <div class="nav-item active" onclick="switchTab('teacher-students', this)">My Students</div>
+                <div class="nav-item" onclick="switchTab('teacher-attendance', this)">Mark Attendance</div>
+                <div class="nav-item" onclick="switchTab('teacher-grades', this)">Enter Grades</div>
+            </div>
+
+            <div id="menu-student" class="hidden">
+                <div class="nav-item active" onclick="switchTab('student-grades', this)">My Grades</div>
+                <div class="nav-item" onclick="switchTab('student-attendance', this)">My Attendance</div>
+            </div>
+
+            <div style="margin-top: auto;">
+                <div class="nav-item" onclick="logout()" style="color: #ef4444;">Logout</div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="header">
+                <h1 id="page-title">Dashboard</h1>
+                <div id="user-info" style="font-weight: 600;"></div>
+            </div>
+
+            <!-- ADMIN TABS -->
+            <div id="tab-admin-students" class="hidden">
+                <div class="card">
+                    <h3>Add New Student</h3>
+                    <div class="form-row">
+                        <input type="text" id="s-adm" placeholder="Admission No">
+                        <input type="text" id="s-first" placeholder="First Name">
+                        <input type="text" id="s-last" placeholder="Last Name">
+                        <select id="s-gender">
+                            <option value="">Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <input type="email" id="s-email" placeholder="Email">
+                        <input type="password" id="s-pass" placeholder="Password">
+                        <button onclick="addStudent()">Add Student</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>All Students</h3>
+                    <table>
+                        <thead><tr><th>ID</th><th>Admission No</th><th>Name</th><th>Gender</th><th>Actions</th></tr></thead>
+                        <tbody id="students-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-admin-teachers" class="hidden">
+                <div class="card">
+                    <h3>Add New Teacher</h3>
+                    <div class="form-row">
+                        <input type="text" id="t-emp" placeholder="Employee No">
+                        <input type="text" id="t-first" placeholder="First Name">
+                        <input type="text" id="t-last" placeholder="Last Name">
+                        <input type="text" id="t-phone" placeholder="Phone (Optional)">
+                        <input type="email" id="t-email" placeholder="Email">
+                        <input type="password" id="t-pass" placeholder="Password">
+                        <button onclick="addTeacher()">Add Teacher</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>All Teachers</h3>
+                    <table>
+                        <thead><tr><th>ID</th><th>Employee No</th><th>Name</th><th>Phone</th><th>Actions</th></tr></thead>
+                        <tbody id="teachers-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-admin-enrollments" class="hidden">
+                <div class="card">
+                    <h3>Enroll Student in Section 1</h3>
+                    <div class="form-row">
+                        <input type="number" id="enr-student" placeholder="Student ID (e.g. 1)">
+                        <input type="number" id="enr-section" placeholder="Section ID (1)" value="1">
+                        <button onclick="enrollStudent()">Enroll Student</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Current Roster (Section 1)</h3>
+                    <table>
+                        <thead><tr><th>ID</th><th>Admission No</th><th>Name</th></tr></thead>
+                        <tbody id="enr-roster-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-admin-assignments" class="hidden">
+                <div class="card">
+                    <h3>Assign Teacher to Subject & Section 1</h3>
+                    <div class="form-row">
+                        <input type="number" id="asg-teacher" placeholder="Teacher ID (e.g. 2)">
+                        <input type="number" id="asg-subject" placeholder="Subject ID (1)" value="1">
+                        <input type="number" id="asg-section" placeholder="Section ID (1)" value="1">
+                        <button onclick="assignTeacher()">Assign</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Current Assignments (Section 1)</h3>
+                    <table>
+                        <thead><tr><th>ID</th><th>Teacher ID</th><th>Subject ID</th></tr></thead>
+                        <tbody id="asg-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-admin-assessments" class="hidden">
+                <div class="card">
+                    <h3>Create New Assessment</h3>
+                    <div class="form-row">
+                        <input type="text" id="a-title" placeholder="Title (e.g. Math Exam 1)">
+                        <select id="a-type">
+                            <option value="exam">Exam</option>
+                            <option value="quiz">Quiz</option>
+                            <option value="assignment">Assignment</option>
+                        </select>
+                        <input type="number" id="a-max" placeholder="Max Score" value="100">
+                        <input type="number" id="a-subject" placeholder="Subject ID (1)" value="1">
+                        <input type="number" id="a-term" placeholder="Term ID (1)" value="1">
+                        <input type="number" id="a-section" placeholder="Section ID (1)" value="1">
+                        <button onclick="createAssessment()">Create</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>All Assessments</h3>
+                    <table>
+                        <thead><tr><th>ID</th><th>Title</th><th>Type</th><th>Max Score</th><th>Section</th></tr></thead>
+                        <tbody id="assessments-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TEACHER TABS -->
+            <div id="tab-teacher-students" class="hidden">
+                <div class="card">
+                    <h3>My Students (Section 1)</h3>
+                    <table>
+                        <thead><tr><th>ID</th><th>Admission No</th><th>Name</th></tr></thead>
+                        <tbody id="t-students-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-teacher-attendance" class="hidden">
+                <div class="card">
+                    <h3>Mark Today's Attendance</h3>
+                    <div class="form-row">
+                        <input type="date" id="att-date">
+                        <button class="btn-success" onclick="markAttendance()">Submit Attendance</button>
+                    </div>
+                    <table>
+                        <thead><tr><th>Student ID</th><th>Name</th><th>Status</th><th>Note (Optional)</th></tr></thead>
+                        <tbody id="t-attendance-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-teacher-grades" class="hidden">
+                <div class="card">
+                    <h3>Enter Grades</h3>
+                    <div class="form-row">
+                        <select id="grade-assessment" onchange="loadGradeForm()">
+                            <option value="">Select an Assessment...</option>
+                        </select>
+                    </div>
+                    <table>
+                        <thead><tr><th>Student ID</th><th>Name</th><th>Score</th></tr></thead>
+                        <tbody id="t-grades-table"></tbody>
+                    </table>
+                    <button class="btn-success" style="margin-top: 1rem; width: auto;" onclick="submitGrades()">Save Grades</button>
+                </div>
+            </div>
+
+            <!-- STUDENT TABS -->
+            <div id="tab-student-grades" class="hidden">
+                <div class="card">
+                    <h3>My Report Card</h3>
+                    <div id="report-card" style="margin-top: 1rem;"></div>
+                </div>
+            </div>
+
+            <div id="tab-student-attendance" class="hidden">
+                <div class="card">
+                    <h3>My Attendance Summary</h3>
+                    <div id="attendance-summary" style="margin-top: 1rem;"></div>
+                </div>
+                <div class="card">
+                    <h3>Recent Records</h3>
+                    <table>
+                        <thead><tr><th>Date</th><th>Status</th><th>Note</th></tr></thead>
+                        <tbody id="attendance-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- EDIT MODAL -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title" style="margin-bottom: 1.5rem;">Edit</h3>
+            <input type="hidden" id="edit-id">
+            <input type="hidden" id="edit-type">
+            <input type="text" id="edit-first" placeholder="First Name">
+            <input type="text" id="edit-last" placeholder="Last Name">
+            <select id="edit-gender" style="display: none;">
+                <option value="">Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+            </select>
+            <input type="text" id="edit-phone" placeholder="Phone" style="display: none;">
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button class="btn-success" onclick="saveEdit()">Save Changes</button>
+                <button style="background: #6b7280;" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token');
+        let currentUser = null;
+        let teacherAssessments = [];
+
+        if (token) loadUser();
+
+        // --- AUTHENTICATION ---
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.style.display = 'none';
+            
+            const formData = new URLSearchParams();
+            formData.append('username', email);
+            formData.append('password', password);
+
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData
+                });
+                if (!res.ok) throw new Error('Invalid credentials');
+                const data = await res.json();
+                token = data.access_token;
+                localStorage.setItem('token', token);
+                loadUser();
+            } catch (err) {
+                errorDiv.innerText = err.message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            token = null;
+            currentUser = null;
+            location.reload();
+        }
+
+        function showForgotModal() { document.getElementById('forgot-modal').style.display = 'flex'; }
+        function closeForgotModal() { document.getElementById('forgot-modal').style.display = 'none'; }
+
+        async function resetPassword() {
+            const email = document.getElementById('reset-email').value;
+            const newPass = document.getElementById('reset-pass').value;
+            const errorDiv = document.getElementById('reset-error');
+            errorDiv.style.display = 'none';
+
+            if (newPass.length < 8) {
+                errorDiv.innerText = "Password must be at least 8 characters.";
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const res = await fetch('/auth/reset-password', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, new_password: newPass })
+            });
+
+            if (res.ok) {
+                alert("Password reset successfully! You can now log in.");
+                closeForgotModal();
+                document.getElementById('email').value = email; // Pre-fill email
+            } else {
+                const err = await res.json();
+                errorDiv.innerText = err.detail || "Error resetting password";
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // --- ADMIN: RESET USER PASSWORD ---
+        async function adminResetPassword(email) {
+            const newPass = prompt(`Enter new password for ${email} (min 8 chars):`);
+            if (!newPass) return;
+            if (newPass.length < 8) return alert("Password must be at least 8 characters.");
+
+            const res = await apiFetch('/auth/reset-password', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, new_password: newPass })
+            });
+
+            if (res.ok) alert("Password reset successfully!");
+            else alert("Failed to reset password. User may not have an email account.");
+        }
+
+        async function apiFetch(endpoint, options = {}) {
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+            const res = await fetch(endpoint, options);
+            if (res.status === 401) logout();
+            return res;
+        }
+
+        // --- NAVIGATION ---
+        async function loadUser() {
+            const res = await apiFetch('/auth/me');
+            if (!res.ok) return logout();
+            currentUser = await res.json();
+            
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'flex';
+            document.getElementById('user-info').innerText = `${currentUser.full_name} (${currentUser.role})`;
+
+            if (currentUser.role === 'admin') {
+                document.getElementById('menu-admin').classList.remove('hidden');
+                switchTab('admin-students', document.querySelector('#menu-admin .nav-item'));
+            } else if (currentUser.role === 'teacher') {
+                document.getElementById('menu-teacher').classList.remove('hidden');
+                switchTab('teacher-students', document.querySelector('#menu-teacher .nav-item'));
+            } else if (currentUser.role === 'student') {
+                document.getElementById('menu-student').classList.remove('hidden');
+                switchTab('student-grades', document.querySelector('#menu-student .nav-item'));
+            }
+        }
+
+        function switchTab(tabName, el) {
+            if (el) {
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                el.classList.add('active');
+            }
+            document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            document.getElementById('page-title').innerText = el ? el.innerText : "Dashboard";
+            
+            if (tabName === 'admin-students') loadStudents();
+            if (tabName === 'admin-teachers') loadTeachers();
+            if (tabName === 'admin-enrollments') loadEnrollments();
+            if (tabName === 'admin-assignments') loadAssignments();
+            if (tabName === 'admin-assessments') loadAssessments();
+            if (tabName === 'teacher-students') loadTeacherStudents();
+            if (tabName === 'teacher-attendance') loadTeacherAttendanceForm();
+            if (tabName === 'teacher-grades') loadTeacherGradeDropdown();
+            if (tabName === 'student-grades') loadGrades();
+            if (tabName === 'student-attendance') loadAttendance();
+        }
+
+        // --- ADMIN: ASSESSMENTS ---
+        async function loadAssessments() {
+            const res = await apiFetch('/assessments');
+            const assessments = await res.json();
+            document.getElementById('assessments-table').innerHTML = assessments.map(a => `
+                <tr>
+                    <td>${a.id}</td><td>${a.title}</td><td>${a.type}</td><td>${a.max_score}</td><td>${a.section_id}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function createAssessment() {
+            const data = {
+                title: document.getElementById('a-title').value,
+                type: document.getElementById('a-type').value,
+                max_score: parseFloat(document.getElementById('a-max').value),
+                subject_id: parseInt(document.getElementById('a-subject').value),
+                term_id: parseInt(document.getElementById('a-term').value),
+                section_id: parseInt(document.getElementById('a-section').value)
+            };
+            if (!data.title || !data.max_score) return alert('Fill required fields');
+
+            const res = await apiFetch('/assessments', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+            });
+            
+            if (res.ok) {
+                document.getElementById('a-title').value = '';
+                loadAssessments();
+            } else alert("Error creating assessment.");
+        }
+
+        // --- TEACHER: GRADES ---
+        async function loadTeacherGradeDropdown() {
+            const res = await apiFetch('/assessments?section_id=1');
+            teacherAssessments = await res.json();
+            const select = document.getElementById('grade-assessment');
+            select.innerHTML = '<option value="">Select an Assessment...</option>' + 
+                teacherAssessments.map(a => `<option value="${a.id}">${a.title} (Max: ${a.max_score})</option>`).join('');
+            document.getElementById('t-grades-table').innerHTML = '';
+        }
+
+        async function loadGradeForm() {
+            const assessmentId = document.getElementById('grade-assessment').value;
+            if (!assessmentId) return document.getElementById('t-grades-table').innerHTML = '';
+            const res = await apiFetch('/sections/1/students');
+            const students = await res.json();
+            document.getElementById('t-grades-table').innerHTML = students.map(s => `
+                <tr>
+                    <td>${s.id}</td><td>${s.first_name} ${s.last_name}</td>
+                    <td><input type="number" id="grade-${s.id}" placeholder="Score" style="margin-bottom: 0;"></td>
+                </tr>
+            `).join('');
+        }
+
+        async function submitGrades() {
+            const assessmentId = document.getElementById('grade-assessment').value;
+            if (!assessmentId) return alert("Select an assessment first.");
+            const records = [];
+            const rows = document.querySelectorAll('#t-grades-table tr');
+            rows.forEach(row => {
+                const studentId = row.children[0].innerText;
+                const scoreInput = document.getElementById(`grade-${studentId}`).value;
+                if (scoreInput !== '') records.push({ student_id: parseInt(studentId), score: parseFloat(scoreInput) });
+            });
+
+            if (records.length === 0) return alert("Enter at least one grade.");
+            const res = await apiFetch(`/assessments/${assessmentId}/scores`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ records: records })
+            });
+
+            if (res.ok) { alert("Grades saved!"); loadGradeForm(); } 
+            else alert("Error saving grades.");
+        }
+
+        // --- ADMIN: CRUD & ENROLLMENTS ---
+        async function loadStudents() {
+            const res = await apiFetch('/students');
+            const students = await res.json();
+            // Note: We now pass the email to the Reset Password button
+            document.getElementById('students-table').innerHTML = students.map(s => `
+                <tr>
+                    <td>${s.id}</td><td>${s.admission_no}</td><td>${s.first_name} ${s.last_name}</td><td>${s.gender || '-'}</td>
+                    <td>
+                        <button class="btn-sm btn-secondary" onclick="adminResetPassword('${s.email || ''}')">Reset Pass</button>
+                        <button class="btn-sm btn-warning" onclick="openModal(${s.id}, 'student', '${s.first_name}', '${s.last_name}', '${s.gender || ''}')">Edit</button>
+                        <button class="btn-sm btn-danger" onclick="deleteStudent(${s.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function deleteStudent(id) {
+            if (!confirm("Delete this student?")) return;
+            const res = await apiFetch(`/students/${id}`, { method: 'DELETE' });
+            if (res.ok) loadStudents(); else alert("Failed to delete.");
+        }
+
+        async function addStudent() {
+            const data = {
+                admission_no: document.getElementById('s-adm').value,
+                first_name: document.getElementById('s-first').value,
+                last_name: document.getElementById('s-last').value,
+                gender: document.getElementById('s-gender').value || null,
+                email: document.getElementById('s-email').value,
+                password: document.getElementById('s-pass').value
+            };
+            if (!data.admission_no || !data.first_name || !data.last_name) return alert('Fill required fields');
+
+            const res = await apiFetch('/students', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                let msg = "Error";
+                if (Array.isArray(errorData.detail)) msg = errorData.detail.map(e => e.msg).join(', ');
+                else if (typeof errorData.detail === 'string') msg = errorData.detail;
+                return alert("BACKEND ERROR: " + msg);
+            }
+            ['s-adm', 's-first', 's-last', 's-gender', 's-email', 's-pass'].forEach(id => document.getElementById(id).value = '');
+            loadStudents();
+        }
+
+        async function loadTeachers() {
+            const res = await apiFetch('/teachers');
+            const teachers = await res.json();
+            document.getElementById('teachers-table').innerHTML = teachers.map(t => `
+                <tr>
+                    <td>${t.id}</td><td>${t.employee_no}</td><td>${t.first_name} ${t.last_name}</td><td>${t.phone || '-'}</td>
+                    <td>
+                        <button class="btn-sm btn-secondary" onclick="adminResetPassword('${t.email || ''}')">Reset Pass</button>
+                        <button class="btn-sm btn-warning" onclick="openModal(${t.id}, 'teacher', '${t.first_name}', '${t.last_name}', '${t.phone || ''}')">Edit</button>
+                        <button class="btn-sm btn-danger" onclick="deleteTeacher(${t.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function deleteTeacher(id) {
+            if (!confirm("Delete this teacher?")) return;
+            const res = await apiFetch(`/teachers/${id}`, { method: 'DELETE' });
+            if (res.ok) loadTeachers(); else alert("Failed to delete.");
+        }
+
+        async function addTeacher() {
+            const data = {
+                employee_no: document.getElementById('t-emp').value,
+                first_name: document.getElementById('t-first').value,
+                last_name: document.getElementById('t-last').value,
+                phone: document.getElementById('t-phone').value,
+                email: document.getElementById('t-email').value,
+                password: document.getElementById('t-pass').value
+            };
+            if (!data.employee_no || !data.first_name || !data.last_name) return alert('Fill required fields');
+
+            const res = await apiFetch('/teachers', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                let msg = "Error";
+                if (Array.isArray(errorData.detail)) msg = errorData.detail.map(e => e.msg).join(', ');
+                else if (typeof errorData.detail === 'string') msg = errorData.detail;
+                return alert("BACKEND ERROR: " + msg);
+            }
+            ['t-emp', 't-first', 't-last', 't-phone', 't-email', 't-pass'].forEach(id => document.getElementById(id).value = '');
+            loadTeachers();
+        }
+
+        async function loadEnrollments() {
+            const res = await apiFetch('/sections/1/students');
+            const students = await res.json();
+            document.getElementById('enr-roster-table').innerHTML = students.map(s => `
+                <tr><td>${s.id}</td><td>${s.admission_no}</td><td>${s.first_name} ${s.last_name}</td></tr>
+            `).join('');
+        }
+
+        async function enrollStudent() {
+            const studentId = document.getElementById('enr-student').value;
+            const sectionId = document.getElementById('enr-section').value;
+            const res = await apiFetch('/enrollments', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: parseInt(studentId), section_id: parseInt(sectionId) })
+            });
+            if (res.ok) { alert("Student enrolled!"); loadEnrollments(); } 
+            else { const err = await res.json(); alert("Error: " + (err.detail || "Could not enroll")); }
+        }
+
+        async function loadAssignments() {
+            const res = await apiFetch('/sections/1/teaching-assignments');
+            const assignments = await res.json();
+            document.getElementById('asg-table').innerHTML = assignments.map(a => `
+                <tr><td>${a.id}</td><td>${a.teacher_id}</td><td>${a.subject_id}</td></tr>
+            `).join('');
+        }
+
+        async function assignTeacher() {
+            const teacherId = document.getElementById('asg-teacher').value;
+            const subjectId = document.getElementById('asg-subject').value;
+            const sectionId = document.getElementById('asg-section').value;
+            const res = await apiFetch('/teaching-assignments', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teacher_id: parseInt(teacherId), subject_id: parseInt(subjectId), section_id: parseInt(sectionId) })
+            });
+            if (res.ok) { alert("Teacher assigned!"); loadAssignments(); } 
+            else { const err = await res.json(); alert("Error: " + (err.detail || "Could not assign")); }
+        }
+
+        // --- EDIT MODAL ---
+        function openModal(id, type, first, last, extra) {
+            document.getElementById('edit-modal').style.display = 'flex';
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-type').value = type;
+            document.getElementById('edit-first').value = first;
+            document.getElementById('edit-last').value = last;
+            
+            if (type === 'student') {
+                document.getElementById('modal-title').innerText = "Edit Student";
+                document.getElementById('edit-gender').style.display = 'block';
+                document.getElementById('edit-gender').value = extra || '';
+                document.getElementById('edit-phone').style.display = 'none';
+            } else {
+                document.getElementById('modal-title').innerText = "Edit Teacher";
+                document.getElementById('edit-gender').style.display = 'none';
+                document.getElementById('edit-phone').style.display = 'block';
+                document.getElementById('edit-phone').value = extra || '';
+            }
+        }
+
+        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
+
+        async function saveEdit() {
+            const id = document.getElementById('edit-id').value;
+            const type = document.getElementById('edit-type').value;
+            const first = document.getElementById('edit-first').value;
+            const last = document.getElementById('edit-last').value;
+            const gender = document.getElementById('edit-gender').value;
+            const phone = document.getElementById('edit-phone').value;
+
+            let endpoint, payload;
+            if (type === 'student') {
+                endpoint = `/students/${id}`; payload = { first_name: first, last_name: last, gender: gender };
+            } else {
+                endpoint = `/teachers/${id}`; payload = { first_name: first, last_name: last, phone: phone };
+            }
+
+            const res = await apiFetch(endpoint, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                closeModal();
+                if (type === 'student') loadStudents(); else loadTeachers();
+            } else alert("Failed to save changes.");
+        }
+
+        // --- TEACHER: ATTENDANCE ---
+        async function loadTeacherStudents() {
+            const res = await apiFetch('/sections/1/students');
+            const students = await res.json();
+            if (students.length === 0) {
+                document.getElementById('t-students-table').innerHTML = '<tr><td colspan="3">No students enrolled.</td></tr>';
+                return;
+            }
+            document.getElementById('t-students-table').innerHTML = students.map(s => `
+                <tr><td>${s.id}</td><td>${s.admission_no}</td><td>${s.first_name} ${s.last_name}</td></tr>
+            `).join('');
+        }
+
+        async function loadTeacherAttendanceForm() {
+            document.getElementById('att-date').valueAsDate = new Date();
+            const res = await apiFetch('/sections/1/students');
+            const students = await res.json();
+            document.getElementById('t-attendance-table').innerHTML = students.map(s => `
+                <tr>
+                    <td>${s.id}</td>
+                    <td>${s.first_name} ${s.last_name}</td>
+                    <td>
+                        <select id="att-${s.id}">
+                            <option value="present">Present</option>
+                            <option value="absent">Absent</option>
+                            <option value="late">Late</option>
+                        </select>
+                    </td>
+                    <td><input type="text" id="note-${s.id}" placeholder="Optional note..." style="margin-bottom: 0;"></td>
+                </tr>
+            `).join('');
+        }
+
+        async function markAttendance() {
+            const date = document.getElementById('att-date').value;
+            const records = [];
+            const rows = document.querySelectorAll('#t-attendance-table tr');
+            rows.forEach(row => {
+                const studentId = row.children[0].innerText;
+                const status = document.getElementById(`att-${studentId}`).value;
+                const note = document.getElementById(`note-${studentId}`).value || null;
+                records.push({ student_id: parseInt(studentId), status: status, note: note });
+            });
+
+            const payload = { section_id: 1, date: date, records: records };
+            const res = await apiFetch('/attendance/bulk', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+
+            if (res.ok) alert("Attendance saved!");
+            else alert("Error saving attendance.");
+        }
+
+        // --- STUDENT VIEWS ---
+        async function loadGrades() {
+            const res = await apiFetch(`/assessments/students/${currentUser.student_id}/report?term_id=1`);
+            if (!res.ok) {
+                document.getElementById('report-card').innerHTML = '<p>No grades found yet.</p>';
+                return;
+            }
+            const data = await res.json();
+            let html = `<h4>Overall Percentage: ${data.overall_percentage}%</h4><br>`;
+            data.subjects.forEach(sub => {
+                html += `<div style="border-left: 4px solid var(--primary); padding: 1rem; background: #f8fafc; margin-bottom: 1rem;">
+                    <h4>${sub.subject_name} (${sub.percentage.toFixed(1)}%)</h4>
+                    <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">`;
+                sub.lines.forEach(line => {
+                    html += `<li>${line.title} (${line.type}): <b>${line.score || 'N/A'}</b> / ${line.max_score}</li>`;
+                });
+                html += `</ul></div>`;
+            });
+            document.getElementById('report-card').innerHTML = html;
+        }
+
+        async function loadAttendance() {
+            const res = await apiFetch(`/attendance/student/${currentUser.student_id}/summary`);
+            const summary = await res.json();
+            let html = `<div class="stat-box">
+                <div class="stat"><h4>${summary.attendance_rate}%</h4><p>Attendance Rate</p></div>
+                <div class="stat"><h4>${summary.total_days}</h4><p>Total Days</p></div>
+                <div class="stat"><h4 style="color: #ef4444">${summary.counts.absent || 0}</h4><p>Absences</p></div>
+            </div>`;
+            document.getElementById('attendance-summary').innerHTML = html;
+
+            const recordsRes = await apiFetch(`/attendance/student/${currentUser.student_id}`);
+            const records = await recordsRes.json();
+            document.getElementById('attendance-table').innerHTML = records.map(r => `
+                <tr><td>${r.date}</td><td>${r.status}</td><td>${r.note || '-'}</td></tr>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
