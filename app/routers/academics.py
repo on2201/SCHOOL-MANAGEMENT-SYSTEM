@@ -4,7 +4,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import assert_section_access, require_roles
-from app.models import AcademicYear, ClassRoom, Enrollment, Role, Section, Student, Subject, Teacher, TeachingAssignment, Term, TimetableEntry, User
+from app.models import (
+    AcademicYear, ClassRoom, Enrollment, Role, Section, Student, Subject, 
+    Teacher, TeachingAssignment, Term, TimetableEntry, User, Assessment
+)
 from app.schemas import (
     AcademicYearCreate, AcademicYearOut, ClassRoomCreate, ClassRoomOut, 
     EnrollmentCreate, EnrollmentOut, SectionCreate, SectionOut, 
@@ -18,6 +21,7 @@ router = APIRouter(tags=["academics"])
 admin_only = require_roles(Role.admin)
 staff = require_roles(Role.admin, Role.teacher)
 
+# --- ACADEMIC YEARS & TERMS ---
 @router.post("/academic-years", response_model=AcademicYearOut, status_code=201)
 def create_year(payload: AcademicYearCreate, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     if payload.is_current: db.execute(AcademicYear.__table__.update().values(is_current=False))
@@ -38,6 +42,7 @@ def list_terms(academic_year_id: int | None = None, db: Session = Depends(get_db
     if academic_year_id: q = q.where(Term.academic_year_id == academic_year_id)
     return db.scalars(q).all()
 
+# --- CLASSROOMS & SECTIONS ---
 @router.post("/classrooms", response_model=ClassRoomOut, status_code=201)
 def create_classroom(payload: ClassRoomCreate, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     room = ClassRoom(**payload.model_dump()); db.add(room); db.commit(); return room
@@ -58,6 +63,7 @@ def list_sections(academic_year_id: int | None = None, db: Session = Depends(get
     if academic_year_id: q = q.where(Section.academic_year_id == academic_year_id)
     return db.scalars(q).all()
 
+# --- SUBJECTS ---
 @router.post("/subjects", response_model=SubjectOut, status_code=201)
 def create_subject(payload: SubjectCreate, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     subject = Subject(**payload.model_dump()); db.add(subject); db.commit(); return subject
@@ -66,6 +72,7 @@ def create_subject(payload: SubjectCreate, db: Session = Depends(get_db), _: Use
 def list_subjects(db: Session = Depends(get_db), _: User = Depends(staff)):
     return db.scalars(select(Subject).order_by(Subject.name)).all()
 
+# --- TEACHERS ---
 @router.post("/teachers", response_model=TeacherOut, status_code=201)
 def create_teacher(payload: TeacherCreate, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     data = payload.model_dump(exclude={"email", "password"}); teacher = Teacher(**data)
@@ -98,9 +105,30 @@ def update_teacher(teacher_id: int, payload: TeacherUpdate, db: Session = Depend
 def delete_teacher(teacher_id: int, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     teacher = db.get(Teacher, teacher_id)
     if not teacher: raise HTTPException(404, "Teacher not found")
-    if teacher.user: db.delete(teacher.user)
-    db.delete(teacher); db.commit(); return None
+    
+    try:
+        user_id = teacher.user_id
+        # Unlink assessments created by this teacher so we don't delete student grades
+        assessments = db.scalars(select(Assessment).where(Assessment.created_by_id == teacher_id)).all()
+        for a in assessments:
+            a.created_by_id = None
+            
+        db.delete(teacher)
+        db.commit()
+        
+        if user_id:
+            user = db.get(User, user_id)
+            if user:
+                db.delete(user)
+                db.commit()
+                
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Database error: {str(e)}")
+        
+    return None
 
+# --- STUDENTS ---
 @router.post("/students", response_model=StudentOut, status_code=201)
 def create_student(payload: StudentCreate, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     data = payload.model_dump(exclude={"email", "password"}); student = Student(**data)
@@ -143,9 +171,27 @@ def update_student(student_id: int, payload: StudentUpdate, db: Session = Depend
 def delete_student(student_id: int, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     student = db.get(Student, student_id)
     if not student: raise HTTPException(404, "Student not found")
-    if student.user: db.delete(student.user)
-    db.delete(student); db.commit(); return None
+    
+    try:
+        user_id = student.user_id
+        
+        # Deleting the student cascades to enrollments, invoices, attendance, and grades
+        db.delete(student)
+        db.commit()
+        
+        if user_id:
+            user = db.get(User, user_id)
+            if user:
+                db.delete(user)
+                db.commit()
+                
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Database error: {str(e)}")
+        
+    return None
 
+# --- ENROLLMENTS & ASSIGNMENTS ---
 @router.post("/enrollments", response_model=EnrollmentOut, status_code=201)
 def enroll(payload: EnrollmentCreate, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     student = db.get(Student, payload.student_id); section = db.get(Section, payload.section_id)
@@ -172,6 +218,7 @@ def list_section_assignments(section_id: int, db: Session = Depends(get_db), use
     assert_section_access(db, user, section_id)
     return db.scalars(select(TeachingAssignment).where(TeachingAssignment.section_id == section_id)).all()
 
+# --- TIMETABLE ---
 @router.post("/timetable", response_model=TimetableOut, status_code=201)
 def add_timetable_entry(payload: TimetableCreate, db: Session = Depends(get_db), _: User = Depends(admin_only)):
     if payload.end_time <= payload.start_time: raise HTTPException(422, "end_time must be after start_time")
