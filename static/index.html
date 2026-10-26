@@ -9,7 +9,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
         
-        #login-screen { display: flex; height: 100vh; align-items: center; justify-content: center; }
+        #login-screen { display: flex; height: 100vh; align-items: center; justify-content: center; padding: 1rem; }
         .login-box { background: var(--surface); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 100%; max-width: 400px; }
         .login-box h2 { margin-bottom: 1.5rem; text-align: center; }
         
@@ -17,7 +17,7 @@
         button { width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
         button:hover { background: #1d4ed8; }
         
-        #dashboard { display: none; height: 100vh; }
+        #dashboard { display: none; height: 100vh; flex-direction: row; }
         .sidebar { width: 250px; background: #111827; color: white; padding: 1rem; display: flex; flex-direction: column; overflow-y: auto; }
         .sidebar h2 { font-size: 1.25rem; margin-bottom: 2rem; text-align: center; }
         .nav-item { padding: 0.75rem; cursor: pointer; border-radius: 4px; margin-bottom: 0.5rem; transition: 0.2s; }
@@ -54,10 +54,32 @@
         .stat h4 { font-size: 2rem; color: var(--primary); }
         .stat p { color: #6b7280; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; }
         .modal-content { background: white; padding: 2rem; border-radius: 8px; width: 100%; max-width: 400px; }
         
         .announcement-item { border-left: 4px solid var(--primary); padding: 1rem; background: #f8fafc; margin-bottom: 1rem; }
+
+        /* --- MOBILE RESPONSIVE STYLES --- */
+        .mobile-header { display: none; background: #111827; color: white; padding: 1rem; align-items: center; justify-content: space-between; }
+        .menu-toggle { display: none; background: none; border: none; color: white; font-size: 1.25rem; cursor: pointer; width: auto; padding: 0; }
+
+        @media (max-width: 768px) {
+            #dashboard { flex-direction: column; }
+            .mobile-header { display: flex; }
+            .menu-toggle { display: block; }
+            .sidebar { display: none; width: 100%; height: auto; max-height: 60vh; overflow-y: auto; border-bottom: 1px solid #374151; }
+            .sidebar.active { display: flex; }
+            .main-content { padding: 1rem; }
+            
+            .header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+            .form-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+            .form-row input, .form-row select, .form-row button { width: 100%; margin-bottom: 0; }
+            .stat-box { flex-direction: column; }
+            .card { padding: 1rem; }
+            
+            /* Make tables scrollable horizontally */
+            table { display: block; overflow-x: auto; white-space: nowrap; }
+        }
     </style>
 </head>
 <body>
@@ -73,7 +95,13 @@
     </div>
 
     <div id="dashboard">
-        <div class="sidebar">
+        <!-- MOBILE HEADER (Hamburger Menu) -->
+        <div class="mobile-header">
+            <h2 style="font-size: 1.1rem; margin: 0;">SMS Dashboard</h2>
+            <button class="menu-toggle" onclick="toggleMobileMenu()">☰ Menu</button>
+        </div>
+
+        <div class="sidebar" id="sidebar">
             <h2>SMS Dashboard</h2>
             
             <div id="menu-admin" class="hidden">
@@ -428,6 +456,11 @@
 
         if (token) loadUser();
 
+        // --- MOBILE MENU TOGGLE ---
+        function toggleMobileMenu() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
         // --- AUTHENTICATION ---
         async function login() {
             const email = document.getElementById('email').value;
@@ -498,6 +531,11 @@
             document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
             document.getElementById(`tab-${tabName}`).classList.remove('hidden');
             document.getElementById('page-title').innerText = el ? el.innerText : "Dashboard";
+
+            // Close mobile menu on navigation
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('active');
+            }
             
             if (tabName === 'admin-home') loadAdminStats();
             if (tabName === 'admin-students') loadStudents();
